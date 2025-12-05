@@ -153,9 +153,39 @@ jobs:
         # 复制源码到构建目录（不修改原始源码）
         cp -r LKM-Source/* $BUILD_DIR/
         
-        # 在构建目录中编译
         cd $BUILD_DIR
-        make -C $KERNEL_DIR M=$(pwd) modules
+        
+        # 检查内核源码中的 binder 相关文件
+        echo "检查内核 binder 路径:"
+        find $KERNEL_DIR/drivers/android -name "binder*.h" 2>/dev/null || echo "未找到 binder 头文件"
+        echo ""
+        
+        # 方案1: 创建相对路径的符号链接
+        if [ -d "$KERNEL_DIR/drivers/android" ]; then
+          # 创建 android 目录链接，使 ../android/xxx.h 能正确解析
+          mkdir -p $(dirname $(pwd)/android)
+          ln -sf $KERNEL_DIR/drivers/android $(pwd)/android
+          echo "✅ 已创建 android 目录链接"
+        fi
+        
+        # 方案2: 通过 EXTRA_CFLAGS 添加搜索路径
+        export EXTRA_CFLAGS="-I$KERNEL_DIR/drivers -I$KERNEL_DIR/drivers/android -I$KERNEL_DIR/include"
+        
+        # 方案3: 如果源码使用了 CONFIG 宏，确保启用相关配置
+        echo "EXTRA_CFLAGS: $EXTRA_CFLAGS"
+        
+        echo ""
+        echo "开始编译..."
+        
+        # 使用 V=1 显示详细编译信息以便调试
+        make -C $KERNEL_DIR M=$(pwd) V=1 modules 2>&1 | tee build.log
+        
+        if [ ${PIPESTATUS[0]} -ne 0 ]; then
+          echo ""
+          echo "❌ 编译失败，显示详细日志:"
+          tail -50 build.log
+          exit 1
+        fi
         
         echo ""
         echo "✅ 编译完成，生成的模块:"
