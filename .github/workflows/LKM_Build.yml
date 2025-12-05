@@ -150,7 +150,7 @@ jobs:
         BUILD_DIR=$(pwd)/build-${{ matrix.kernel_version }}
         mkdir -p $BUILD_DIR
         
-        # 复制源码到构建目录（不修改原始源码）
+        # 复制源码到构建目录
         cp -r LKM-Source/* $BUILD_DIR/
         
         cd $BUILD_DIR
@@ -160,25 +160,31 @@ jobs:
         find $KERNEL_DIR/drivers/android -name "binder*.h" 2>/dev/null || echo "未找到 binder 头文件"
         echo ""
         
-        # 方案1: 创建相对路径的符号链接
-        if [ -d "$KERNEL_DIR/drivers/android" ]; then
-          # 创建 android 目录链接，使 ../android/xxx.h 能正确解析
-          mkdir -p $(dirname $(pwd)/android)
-          ln -sf $KERNEL_DIR/drivers/android $(pwd)/android
-          echo "✅ 已创建 android 目录链接"
-        fi
+        # 修复头文件包含路径问题
+        # 将 #include <../android/xxx.h> 替换为 #include <xxx.h>
+        echo "修复头文件包含路径..."
+        for file in *.c *.h; do
+          if [ -f "$file" ]; then
+            # 使用 sed 替换相对路径的包含
+            sed -i 's|#include <\.\./android/\([^>]*\)>|#include <\1>|g' "$file"
+            echo "已处理: $file"
+          fi
+        done
         
-        # 方案2: 通过 EXTRA_CFLAGS 添加搜索路径
-        export EXTRA_CFLAGS="-I$KERNEL_DIR/drivers -I$KERNEL_DIR/drivers/android -I$KERNEL_DIR/include"
+        echo ""
+        echo "修复后的包含语句:"
+        grep -n "#include.*binder" *.c *.h 2>/dev/null || true
+        echo ""
         
-        # 方案3: 如果源码使用了 CONFIG 宏，确保启用相关配置
+        # 添加 android 驱动目录到编译器搜索路径
+        export EXTRA_CFLAGS="-I$KERNEL_DIR/drivers/android"
+        
         echo "EXTRA_CFLAGS: $EXTRA_CFLAGS"
-        
         echo ""
         echo "开始编译..."
         
-        # 使用 V=1 显示详细编译信息以便调试
-        make -C $KERNEL_DIR M=$(pwd) V=1 modules 2>&1 | tee build.log
+        # 编译模块
+        make -C $KERNEL_DIR M=$(pwd) modules 2>&1 | tee build.log
         
         if [ ${PIPESTATUS[0]} -ne 0 ]; then
           echo ""
