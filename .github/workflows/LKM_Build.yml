@@ -183,14 +183,14 @@ jobs:
         
         # 生成版本信息文件
         cat > output/version-kernel${{ matrix.kernel_version }}.txt << EOF
-Module Version: ${{ needs.prepare.outputs.module_version }}
-Kernel Version: ${{ matrix.kernel_version }}
-Architecture: arm64
-Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-Build Workflow: ${{ github.run_number }}
-Commit SHA: ${{ github.sha }}
-Repository: ${{ github.repository }}
-EOF
+        Module Version: ${{ needs.prepare.outputs.module_version }}
+        Kernel Version: ${{ matrix.kernel_version }}
+        Architecture: arm64
+        Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        Build Workflow: ${{ github.run_number }}
+        Commit SHA: ${{ github.sha }}
+        Repository: ${{ github.repository }}
+        EOF
         
         # 显示生成的文件
         echo ""
